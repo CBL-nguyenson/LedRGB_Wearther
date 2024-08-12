@@ -4,8 +4,8 @@
 #include <Adafruit_NeoPixel.h>
 
 // Thông tin WiFi
-const char* ssid = "SEAN_LAPTOP_4896";
-const char* password = "123456789";
+const char* ssid = "HshopLTK";
+const char* password = "HshopLTK@2311";
 
 // Thông tin API
 float lat = 11.948036748747358;  // Tọa độ hiện tại
@@ -13,26 +13,27 @@ float lon = 108.43815802610034; // Tọa độ hiện tại
 String apiKey = "1e572ba239e0349a69a29be7466a3b6c"; // API key mặc định
 
 // Chân điều khiển LED RGB cơ bản
-const int redPin = 5;
-const int greenPin = 6;
-const int bluePin = 7;
+const int redPin = 20;
+const int greenPin = 21;
+const int bluePin = 10;
 
 // Chân điều khiển LED WS2812
 const int ledPin = 4;
-const int numPixels = 1; // Số lượng LED WS2812
+const int numPixels = 2000; // Số lượng LED WS2812
 
 // Tham số hiệu ứng
-const int pulseSpeed = 10; // Tốc độ dập dìu
-const int colorRange = 10; // Khoảng ±10 cho màu sắc
+const int pulseSpeed = 10; // Tốc độ dập dìu chậm hơn
+const int colorRange = 25; // Khoảng ±10 cho màu sắc
+const int minBrightness = 30; // Độ sáng thấp nhất (40%)
 
 unsigned long lastUpdateTime = 0;
 const unsigned long updateInterval = 60000; // Cập nhật dữ liệu mỗi 60 giây
 
 unsigned long lastPulseTime = 0;
-const unsigned long pulseInterval = 10; // Tốc độ của hiệu ứng dập dìu
+ unsigned long pulseInterval = 100; // Tốc độ của hiệu ứng dập dìu chậm lại
 
 int pulseDirection = 1; // 1 để tăng độ sáng, -1 để giảm độ sáng
-int brightness = 0; // Giá trị độ sáng hiện tại
+int brightness = minBrightness*3; // Giá trị độ sáng hiện tại khởi đầu từ 40%
 
 int baseRedValue, baseGreenValue, baseBlueValue;
 bool weatherDataUpdated = false;
@@ -59,6 +60,9 @@ void setup() {
 
   Serial.println("Connected to WiFi");
   lastUpdateTime = millis();
+
+      fetchWeatherData();
+    weatherDataUpdated = true;
 }
 
 void loop() {
@@ -74,12 +78,14 @@ void loop() {
   // Hiệu ứng dập dìu cho cả LED RGB và LED WS2812
   if (weatherDataUpdated) {
     if (currentMillis - lastPulseTime >= pulseInterval) {
+      pulseInterval = random(10,1000);
       lastPulseTime = currentMillis;
 
       // Cập nhật độ sáng
-      brightness += pulseDirection * 5;
-      if (brightness >= 255 || brightness <= 0) {
+      brightness += pulseDirection * random(-20,20); // Thay đổi độ sáng chậm hơn
+      if (brightness >= 255 || brightness <= minBrightness) {
         pulseDirection *= -1;
+        brightness = constrain(brightness, minBrightness, 255); // Đảm bảo độ sáng không thấp hơn 40%
       }
 
       // Thay đổi màu sắc với hiệu ứng dập dìu
@@ -92,17 +98,29 @@ void loop() {
       greenValue = constrain(greenValue, 0, 255);
       blueValue = constrain(blueValue, 0, 255);
 
+      // In ra giá trị màu và độ sáng hiện tại
+      Serial.print("LED RGB Value - R: ");
+      Serial.print(redValue);
+      Serial.print(" G: ");
+      Serial.print(greenValue);
+      Serial.print(" B: ");
+      Serial.print(blueValue);
+      Serial.print(" | Brightness: ");
+      Serial.println(brightness);
+
       // Cập nhật LED RGB cơ bản
       analogWrite(redPin, (redValue * brightness) / 255);
       analogWrite(greenPin, (greenValue * brightness) / 255);
       analogWrite(bluePin, (blueValue * brightness) / 255);
 
       // Cập nhật LED WS2812
-      strip.setPixelColor(0, strip.Color(
-        (redValue * brightness) / 255,
-        (greenValue * brightness) / 255,
-        (blueValue * brightness) / 255
-      ));
+      for (int i = 0; i < numPixels; i++) {
+        strip.setPixelColor(i, strip.Color(
+          (redValue * brightness) / 255,
+          (greenValue * brightness) / 255,
+          (blueValue * brightness) / 255
+        ));
+      }
       strip.show();
     }
   }
@@ -125,10 +143,16 @@ void fetchWeatherData() {
 
       String weather = doc["weather"][0]["main"];
 
+      Serial.print("Weather Condition: ");
+      Serial.println(weather);
+
+
+// weather = "Thunderstorm";
+
       // Điều chỉnh màu sắc cơ bản dựa trên tình trạng thời tiết
       if (weather == "Clear") {
         baseRedValue = 255;
-        baseGreenValue = 255;
+        baseGreenValue = 235;
         baseBlueValue = 0; // Vàng: Nắng
       } else if (weather == "Clouds") {
         baseRedValue = 192;
